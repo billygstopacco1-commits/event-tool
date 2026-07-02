@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>행사 어미상품 코드 찾기 도구</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; background: #f0f2f5; color: #222; padding: 24px; }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  .sub { color: #666; font-size: 13px; margin-bottom: 20px; }
+  .drops { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .drop { background: #fff; border: 2px dashed #b0b8c4; border-radius: 10px; padding: 28px 16px; text-align: center; cursor: pointer; transition: .15s; }
+  .drop:hover, .drop.over { border-color: #305496; background: #eef3fb; }
+  .drop.ok { border-style: solid; border-color: #2e9e5b; background: #f0faf4; }
+  .drop .t { font-weight: bold; font-size: 15px; margin-bottom: 6px; }
+  .drop .d { font-size: 12px; color: #888; }
+  .drop .f { font-size: 12px; color: #2e9e5b; margin-top: 8px; font-weight: bold; word-break: break-all; }
+  .btns { display: flex; gap: 10px; margin-bottom: 20px; }
+  button { border: 0; border-radius: 8px; padding: 12px 22px; font-size: 15px; font-weight: bold; cursor: pointer; font-family: inherit; }
+  #runBtn { background: #305496; color: #fff; flex: 1; }
+  #runBtn:disabled { background: #b0b8c4; cursor: not-allowed; }
+  #dlBtn { background: #2e9e5b; color: #fff; display: none; }
+  .summary { display: none; gap: 12px; margin-bottom: 16px; }
+  .card { background: #fff; border-radius: 10px; padding: 14px 20px; flex: 1; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .card .n { font-size: 26px; font-weight: bold; }
+  .card .l { font-size: 12px; color: #777; }
+  .c1 .n { color: #305496; } .c2 .n { color: #2e9e5b; } .c3 .n { color: #d97706; }
+  section { background: #fff; border-radius: 10px; padding: 18px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08); display: none; }
+  section h2 { font-size: 16px; margin-bottom: 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { background: #305496; color: #fff; padding: 8px 10px; text-align: left; white-space: nowrap; }
+  td { padding: 7px 10px; border-bottom: 1px solid #e5e8ee; }
+  tr:hover td { background: #f5f8fd; }
+  .warn th { background: #d97706; }
+  .hint { font-size: 12px; color: #888; margin-top: 8px; }
+  .err { color: #c0392b; font-size: 13px; margin-bottom: 12px; display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📋 행사 어미상품 코드 찾기</h1>
+  <p class="sub">① 행사 단품 엑셀과 ② 상품관리(어미상품) 엑셀을 넣고 [매칭 실행]을 누르세요. 상품명의 NO번호 범위와 시리즈명(워터밤, 아로마 등)으로 자동 매칭합니다.</p>
+
+  <div class="drops">
+    <div class="drop" id="dropA">
+      <div class="t">① 행사 단품 파일</div>
+      <div class="d">클릭하거나 엑셀 파일을 여기로 드래그<br>(관리번호·바코드·품명 포함)</div>
+      <div class="f" id="fileA"></div>
+      <input type="file" id="inputA" accept=".xlsx,.xls" hidden>
+    </div>
+    <div class="drop" id="dropB">
+      <div class="t">② 상품관리(어미상품) 파일</div>
+      <div class="d">클릭하거나 엑셀 파일을 여기로 드래그<br>(관리번호·바코드·품명 포함)</div>
+      <div class="f" id="fileB"></div>
+      <input type="file" id="inputB" accept=".xlsx,.xls" hidden>
+    </div>
+  </div>
+
+  <p class="err" id="err"></p>
+  <div class="btns">
+    <button id="runBtn" disabled>매칭 실행</button>
+    <button id="dlBtn">📥 결과 엑셀 다운로드</button>
+  </div>
+
+  <div class="summary" id="summary">
+    <div class="card c1"><div class="n" id="nParent">0</div><div class="l">어미상품</div></div>
+    <div class="card c2"><div class="n" id="nMatch">0</div><div class="l">매칭된 단품</div></div>
+    <div class="card c3"><div class="n" id="nMiss">0</div><div class="l">미매칭 단품</div></div>
+  </div>
+
+  <section id="secParent">
+    <h2>✅ 어미상품 코드리스트</h2>
+    <table><thead><tr><th>관리번호</th><th>바코드</th><th>상품명</th><th>매칭 단품수</th></tr></thead><tbody id="tbParent"></tbody></table>
+  </section>
+
+  <section id="secMiss">
+    <h2>⚠️ 미매칭 단품 (어미상품을 못 찾은 항목)</h2>
+    <table class="warn"><thead><tr><th>관리번호</th><th>바코드</th><th>단품명</th><th>추출된 시리즈</th></tr></thead><tbody id="tbMiss"></tbody></table>
+    <p class="hint">상품관리 파일에 해당 시리즈의 어미상품이 없는 경우입니다. 직접 확인해 주세요.</p>
+  </section>
+
+  <section id="secDetail">
+    <h2>🔍 매칭 상세 (근거 확인용)</h2>
+    <table><thead><tr><th>단품 관리번호</th><th>단품명</th><th>어미 관리번호</th><th>어미 상품명</th><th>매칭 근거</th></tr></thead><tbody id="tbDetail"></tbody></table>
+  </section>
+</div>
+
+<script>
+const STOPWORDS = new Set(['선택','교차가능','온라인','온라인행사','행사1+1','전컬러','낱개']);
+let dataA = null, dataB = null, result = null;
+
+function setupDrop(dropId, inputId, fileLabelId, setter) {
+  const drop = document.getElementById(dropId);
+  const input = document.getElementById(inputId);
+  const label = document.getElementById(fileLabelId);
+  drop.addEventListener('click', () => input.click());
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+  drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over'); if (e.dataTransfer.files[0]) handle(e.dataTransfer.files[0]); });
+  input.addEventListener('change', () => { if (input.files[0]) handle(input.files[0]); });
+  function handle(file) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+        const parsed = extractRows(rows);
+        if (parsed.length === 0) throw new Error('상품 데이터를 찾지 못했습니다. 관리번호·바코드·품명 열이 있는지 확인하세요.');
+        setter(parsed);
+        drop.classList.add('ok');
+        label.textContent = file.name + ' (' + parsed.length + '개 상품)';
+        checkReady();
+      } catch (err) { showErr(file.name + ' 읽기 실패: ' + err.message); }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+}
+
+// 헤더 행(관리번호 포함)을 찾아 열 위치 자동 감지, 없으면 A/B/C열 사용
+function extractRows(rows) {
+  let ci = { code: 0, barcode: 1, name: 2 }, start = 0;
+  for (let i = 0; i < Math.min(rows.length, 10); i++) {
+    const r = rows[i] || [];
+    const idx = r.findIndex(c => typeof c === 'string' && c.replace(/\s/g, '').includes('관리번호'));
+    if (idx >= 0) {
+      ci.code = idx;
+      const bi = r.findIndex(c => typeof c === 'string' && c.includes('바코드'));
+      const ni = r.findIndex(c => typeof c === 'string' && (c.includes('품명') || c.includes('상품명')));
+      if (bi >= 0) ci.barcode = bi;
+      if (ni >= 0) ci.name = ni;
+      start = i + 1;
+      break;
+    }
+  }
+  const out = [];
+  for (let i = start; i < rows.length; i++) {
+    const r = rows[i] || [];
+    const code = r[ci.code], name = r[ci.name];
+    if (code == null || name == null) continue;
+    const codeNum = Number(String(code).trim());
+    if (!isFinite(codeNum) || String(code).trim() === '') continue;
+    out.push({ code: codeNum, barcode: r[ci.barcode] != null ? String(r[ci.barcode]) : '', name: String(name) });
+  }
+  return out;
+}
+
+function parseOption(name) {
+  let no = null, kw = null;
+  const m = name.match(/NO\s*(\d+)/i);
+  if (m) no = parseInt(m[1]);
+  const kws = [...name.matchAll(/\(([^()]+)\)/g)].map(x => x[1].trim().replace(/\)+$/, ''));
+  for (let i = kws.length - 1; i >= 0; i--) {
+    const k = kws[i];
+    if (k && !STOPWORDS.has(k) && !/^[\d~,.\s]+$/.test(k)) { kw = k; break; }
+  }
+  if (!kw && no !== null) {
+    const m2 = name.match(/NO\s*\d+\s+([가-힣A-Za-z&]+)/i);
+    if (m2) kw = m2[1].trim();
+  }
+  return { no, kw };
+}
+
+function parseRanges(name) {
+  return [...name.matchAll(/NO\s*(\d+)\s*~\s*(?:NO\s*)?(\d+)/gi)].map(m => [parseInt(m[1]), parseInt(m[2])]);
+}
+
+const norm = s => s.replace(/[\s)()]+/g, '');
+
+function runMatch() {
+  const parents = dataB.map(p => ({ ...p, ranges: parseRanges(p.name), deleted: p.name.includes('삭제') }));
+  const detail = [], parentMap = new Map();
+  for (const opt of dataA) {
+    const { no, kw } = parseOption(opt.name);
+    let best = null, bestScore = 0, bestReason = '';
+    for (const p of parents) {
+      if (p.deleted) continue;
+      let score = 0; const reasons = [];
+      if (no !== null) {
+        for (const [a, b] of p.ranges) {
+          if (a <= no && no <= b) { score += 2; reasons.push('NO' + no + ' ∈ NO' + a + '~' + b); break; }
+        }
+      }
+      if (kw && norm(p.name).includes(kw)) { score += 1; reasons.push("시리즈 '" + kw + "'"); }
+      if (score > bestScore) { bestScore = score; best = p; bestReason = reasons.join(' + '); }
+    }
+    detail.push({ opt, parent: best, reason: bestReason, kw });
+    if (best) {
+      if (!parentMap.has(best.code)) parentMap.set(best.code, { p: best, n: 0 });
+      parentMap.get(best.code).n++;
+    }
+  }
+  result = { detail, parents: [...parentMap.values()].sort((a, b) => a.p.code - b.p.code) };
+  render();
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+function render() {
+  const { detail, parents } = result;
+  const miss = detail.filter(d => !d.parent);
+  document.getElementById('nParent').textContent = parents.length;
+  document.getElementById('nMatch').textContent = detail.length - miss.length;
+  document.getElementById('nMiss').textContent = miss.length;
+  document.getElementById('summary').style.display = 'flex';
+  document.getElementById('tbParent').innerHTML = parents.map(r =>
+    '<tr><td>' + r.p.code + '</td><td>' + esc(r.p.barcode) + '</td><td>' + esc(r.p.name) + '</td><td>' + r.n + '</td></tr>').join('');
+  document.getElementById('secParent').style.display = 'block';
+  document.getElementById('tbMiss').innerHTML = miss.map(d =>
+    '<tr><td>' + d.opt.code + '</td><td>' + esc(d.opt.barcode) + '</td><td>' + esc(d.opt.name) + '</td><td>' + esc(d.kw || '') + '</td></tr>').join('');
+  document.getElementById('secMiss').style.display = miss.length ? 'block' : 'none';
+  document.getElementById('tbDetail').innerHTML = detail.filter(d => d.parent).map(d =>
+    '<tr><td>' + d.opt.code + '</td><td>' + esc(d.opt.name) + '</td><td>' + d.parent.code + '</td><td>' + esc(d.parent.name) + '</td><td>' + esc(d.reason) + '</td></tr>').join('');
+  document.getElementById('secDetail').style.display = 'block';
+  document.getElementById('dlBtn').style.display = 'inline-block';
+}
+
+function download() {
+  const { detail, parents } = result;
+  const wb = XLSX.utils.book_new();
+  const s1 = [['관리번호', '바코드', '상품명', '매칭 단품수'],
+    ...parents.map(r => [r.p.code, r.p.barcode, r.p.name, r.n])];
+  const s2 = [['단품 관리번호', '단품 바코드', '단품명', '어미 관리번호', '어미 바코드', '어미 상품명', '매칭 근거'],
+    ...detail.filter(d => d.parent).map(d => [d.opt.code, d.opt.barcode, d.opt.name, d.parent.code, d.parent.barcode, d.parent.name, d.reason])];
+  const s3 = [['관리번호', '바코드', '단품명', '추출된 시리즈'],
+    ...detail.filter(d => !d.parent).map(d => [d.opt.code, d.opt.barcode, d.opt.name, d.kw || ''])];
+  const w1 = XLSX.utils.aoa_to_sheet(s1); w1['!cols'] = [{wch:10},{wch:12},{wch:60},{wch:11}];
+  const w2 = XLSX.utils.aoa_to_sheet(s2); w2['!cols'] = [{wch:12},{wch:12},{wch:50},{wch:12},{wch:12},{wch:50},{wch:28}];
+  const w3 = XLSX.utils.aoa_to_sheet(s3); w3['!cols'] = [{wch:12},{wch:12},{wch:55},{wch:16}];
+  XLSX.utils.book_append_sheet(wb, w1, '어미상품 리스트');
+  XLSX.utils.book_append_sheet(wb, w2, '매칭 상세');
+  XLSX.utils.book_append_sheet(wb, w3, '미매칭 단품');
+  const d = new Date(), ym = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  XLSX.writeFile(wb, '행사_어미상품_코드리스트_' + ym + '.xlsx');
+}
+
+function showErr(msg) { const e = document.getElementById('err'); e.textContent = msg; e.style.display = 'block'; }
+function checkReady() {
+  document.getElementById('err').style.display = 'none';
+  document.getElementById('runBtn').disabled = !(dataA && dataB);
+}
+
+setupDrop('dropA', 'inputA', 'fileA', v => dataA = v);
+setupDrop('dropB', 'inputB', 'fileB', v => dataB = v);
+document.getElementById('runBtn').addEventListener('click', runMatch);
+document.getElementById('dlBtn').addEventListener('click', download);
+</script>
+</body>
+</html>
