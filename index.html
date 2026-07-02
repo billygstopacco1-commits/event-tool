@@ -2,72 +2,75 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>행사 어미상품 코드 찾기 도구</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<title>행사 어미상품 코드 찾기</title>
 <style>
+  :root { color-scheme: light; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; background: #f0f2f5; color: #222; padding: 24px; }
-  .wrap { max-width: 1100px; margin: 0 auto; }
-  h1 { font-size: 22px; margin-bottom: 4px; }
-  .sub { color: #666; font-size: 13px; margin-bottom: 20px; }
-  .drops { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
-  .drop { background: #fff; border: 2px dashed #b0b8c4; border-radius: 10px; padding: 28px 16px; text-align: center; cursor: pointer; transition: .15s; }
+  body { font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; background: #f5f6f8; color: #222; padding: 20px; }
+  h1 { font-size: 19px; margin-bottom: 4px; }
+  .sub { color: #666; font-size: 12px; margin-bottom: 16px; line-height: 1.5; }
+  .drops { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .drop { background: #fff; border: 2px dashed #b0b8c4; border-radius: 10px; padding: 20px 12px; text-align: center; cursor: pointer; transition: .15s; }
   .drop:hover, .drop.over { border-color: #305496; background: #eef3fb; }
   .drop.ok { border-style: solid; border-color: #2e9e5b; background: #f0faf4; }
-  .drop .t { font-weight: bold; font-size: 15px; margin-bottom: 6px; }
-  .drop .d { font-size: 12px; color: #888; }
-  .drop .f { font-size: 12px; color: #2e9e5b; margin-top: 8px; font-weight: bold; word-break: break-all; }
-  .btns { display: flex; gap: 10px; margin-bottom: 20px; }
-  button { border: 0; border-radius: 8px; padding: 12px 22px; font-size: 15px; font-weight: bold; cursor: pointer; font-family: inherit; }
-  #runBtn { background: #305496; color: #fff; flex: 1; }
+  .drop .t { font-weight: bold; font-size: 14px; margin-bottom: 4px; }
+  .drop .d { font-size: 11px; color: #888; }
+  .drop .f { font-size: 11px; color: #2e9e5b; margin-top: 6px; font-weight: bold; word-break: break-all; }
+  .btns { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  button { border: 0; border-radius: 8px; padding: 10px 18px; font-size: 14px; font-weight: bold; cursor: pointer; font-family: inherit; }
+  #runBtn { background: #305496; color: #fff; flex: 1; min-width: 140px; }
   #runBtn:disabled { background: #b0b8c4; cursor: not-allowed; }
-  #dlBtn { background: #2e9e5b; color: #fff; display: none; }
-  .summary { display: none; gap: 12px; margin-bottom: 16px; }
-  .card { background: #fff; border-radius: 10px; padding: 14px 20px; flex: 1; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
-  .card .n { font-size: 26px; font-weight: bold; }
-  .card .l { font-size: 12px; color: #777; }
+  .dl { background: #2e9e5b; color: #fff; display: none; font-size: 12px; }
+  #copyBtn { background: #6b7280; color: #fff; display: none; font-size: 12px; }
+  .summary { display: none; gap: 10px; margin-bottom: 14px; }
+  .card { background: #fff; border-radius: 10px; padding: 10px 16px; flex: 1; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .card .n { font-size: 22px; font-weight: bold; }
+  .card .l { font-size: 11px; color: #777; }
   .c1 .n { color: #305496; } .c2 .n { color: #2e9e5b; } .c3 .n { color: #d97706; }
-  section { background: #fff; border-radius: 10px; padding: 18px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08); display: none; }
-  section h2 { font-size: 16px; margin-bottom: 10px; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th { background: #305496; color: #fff; padding: 8px 10px; text-align: left; white-space: nowrap; }
-  td { padding: 7px 10px; border-bottom: 1px solid #e5e8ee; }
+  section { background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.08); display: none; }
+  section h2 { font-size: 14px; margin-bottom: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { background: #305496; color: #fff; padding: 6px 8px; text-align: left; white-space: nowrap; }
+  td { padding: 6px 8px; border-bottom: 1px solid #e5e8ee; }
   tr:hover td { background: #f5f8fd; }
   .warn th { background: #d97706; }
-  .hint { font-size: 12px; color: #888; margin-top: 8px; }
-  .err { color: #c0392b; font-size: 13px; margin-bottom: 12px; display: none; }
+  .hint { font-size: 11px; color: #888; margin-top: 6px; }
+  .err { color: #c0392b; font-size: 12px; margin-bottom: 10px; display: none; }
+  details { margin-bottom: 14px; }
+  summary { font-size: 12px; color: #555; cursor: pointer; }
 </style>
 </head>
 <body>
-<div class="wrap">
   <h1>📋 행사 어미상품 코드 찾기</h1>
-  <p class="sub">① 행사 단품 엑셀과 ② 상품관리(어미상품) 엑셀을 넣고 [매칭 실행]을 누르세요. 상품명의 NO번호 범위와 시리즈명(워터밤, 아로마 등)으로 자동 매칭합니다.</p>
+  <p class="sub">① 행사 단품 엑셀 + ② 상품관리(어미상품) 엑셀 → 상품명의 NO번호 범위와 시리즈명(워터밤, 아로마 등)으로 자동 매칭. 상품명에 '삭제'가 포함된 어미상품은 제외됩니다.</p>
 
   <div class="drops">
     <div class="drop" id="dropA">
       <div class="t">① 행사 단품 파일</div>
-      <div class="d">클릭하거나 엑셀 파일을 여기로 드래그<br>(관리번호·바코드·품명 포함)</div>
+      <div class="d">클릭 또는 xlsx 드래그</div>
       <div class="f" id="fileA"></div>
-      <input type="file" id="inputA" accept=".xlsx,.xls" hidden>
+      <input type="file" id="inputA" accept=".xlsx" hidden>
     </div>
     <div class="drop" id="dropB">
       <div class="t">② 상품관리(어미상품) 파일</div>
-      <div class="d">클릭하거나 엑셀 파일을 여기로 드래그<br>(관리번호·바코드·품명 포함)</div>
+      <div class="d">클릭 또는 xlsx 드래그</div>
       <div class="f" id="fileB"></div>
-      <input type="file" id="inputB" accept=".xlsx,.xls" hidden>
+      <input type="file" id="inputB" accept=".xlsx" hidden>
     </div>
   </div>
 
   <p class="err" id="err"></p>
   <div class="btns">
     <button id="runBtn" disabled>매칭 실행</button>
-    <button id="dlBtn">📥 결과 엑셀 다운로드</button>
+    <button class="dl" id="dl1">📥 어미상품 CSV</button>
+    <button class="dl" id="dl2">📥 매칭상세 CSV</button>
+    <button class="dl" id="dl3">📥 미매칭 CSV</button>
+    <button id="copyBtn">📄 표 복사(엑셀 붙여넣기용)</button>
   </div>
 
   <div class="summary" id="summary">
     <div class="card c1"><div class="n" id="nParent">0</div><div class="l">어미상품</div></div>
-    <div class="card c2"><div class="n" id="nMatch">0</div><div class="l">매칭된 단품</div></div>
+    <div class="card c2"><div class="n" id="nMatch">0</div><div class="l">매칭 단품</div></div>
     <div class="card c3"><div class="n" id="nMiss">0</div><div class="l">미매칭 단품</div></div>
   </div>
 
@@ -77,50 +80,107 @@
   </section>
 
   <section id="secMiss">
-    <h2>⚠️ 미매칭 단품 (어미상품을 못 찾은 항목)</h2>
+    <h2>⚠️ 미매칭 단품</h2>
     <table class="warn"><thead><tr><th>관리번호</th><th>바코드</th><th>단품명</th><th>추출된 시리즈</th><th>단종</th></tr></thead><tbody id="tbMiss"></tbody></table>
-    <p class="hint">상품관리 파일에 해당 시리즈의 어미상품이 없는 경우입니다. 단종 칸은 상품명에 '단종'·'삭제' 문구가 있으면 자동 체크되며, 클릭해서 직접 표시할 수도 있습니다. 엑셀 다운로드에 포함됩니다.</p>
+    <p class="hint">단종 칸은 상품명에 '단종'·'삭제' 문구가 있으면 자동 체크되며, 클릭해서 직접 표시할 수도 있습니다. CSV에 포함됩니다.</p>
   </section>
 
   <section id="secDetail">
-    <h2>🔍 매칭 상세 (근거 확인용)</h2>
+    <h2>🔍 매칭 상세 (근거)</h2>
     <table><thead><tr><th>단품 관리번호</th><th>단품명</th><th>어미 관리번호</th><th>어미 상품명</th><th>매칭 근거</th></tr></thead><tbody id="tbDetail"></tbody></table>
   </section>
-</div>
 
 <script>
+// ===== 최소 XLSX 리더 (외부 라이브러리 없음) =====
+async function inflateRaw(bytes) {
+  const ds = new DecompressionStream('deflate-raw');
+  const stream = new Blob([bytes]).stream().pipeThrough(ds);
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+async function unzip(buf) {
+  const u8 = new Uint8Array(buf), dv = new DataView(buf);
+  let eocd = -1;
+  for (let i = u8.length - 22; i >= Math.max(0, u8.length - 65558); i--)
+    if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  if (eocd < 0) throw new Error('엑셀(xlsx) 파일이 아닙니다');
+  const count = dv.getUint16(eocd + 10, true);
+  let off = dv.getUint32(eocd + 16, true);
+  const files = {}, td = new TextDecoder();
+  for (let i = 0; i < count; i++) {
+    if (dv.getUint32(off, true) !== 0x02014b50) break;
+    const method = dv.getUint16(off + 10, true);
+    const csize = dv.getUint32(off + 20, true);
+    const nlen = dv.getUint16(off + 28, true);
+    const elen = dv.getUint16(off + 30, true);
+    const clen = dv.getUint16(off + 32, true);
+    const lho = dv.getUint32(off + 42, true);
+    files[td.decode(u8.subarray(off + 46, off + 46 + nlen))] = { method, csize, lho };
+    off += 46 + nlen + elen + clen;
+  }
+  return {
+    async get(name) {
+      const f = files[name];
+      if (!f) return null;
+      const n2 = dv.getUint16(f.lho + 26, true), e2 = dv.getUint16(f.lho + 28, true);
+      const data = u8.subarray(f.lho + 30 + n2 + e2, f.lho + 30 + n2 + e2 + f.csize);
+      return f.method === 0 ? data : await inflateRaw(data);
+    }
+  };
+}
+const unesc = s => s.replace(/&(amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);/g, (m, e) => {
+  if (e === 'amp') return '&'; if (e === 'lt') return '<'; if (e === 'gt') return '>';
+  if (e === 'quot') return '"'; if (e === 'apos') return "'";
+  return String.fromCodePoint(e[1] === 'x' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1)));
+});
+const colIndex = a => { let n = 0; for (const ch of a) n = n * 26 + (ch.charCodeAt(0) - 64); return n - 1; };
+const getT = xml => (xml.match(/<t[^>]*>([\s\S]*?)<\/t>|<t[^>]*\/>/g) || []).map(x => x.replace(/<[^>]*>/g, '')).join('');
+
+async function readXlsxRows(arrayBuffer) {
+  const zip = await unzip(arrayBuffer);
+  const td = new TextDecoder();
+  let sheetPath = 'xl/worksheets/sheet1.xml';
+  try {
+    const wbXml = td.decode(await zip.get('xl/workbook.xml'));
+    const rid = (/<sheet[^>]*r:id="([^"]+)"/.exec(wbXml) || [])[1];
+    const relsXml = td.decode(await zip.get('xl/_rels/workbook.xml.rels'));
+    const t = (new RegExp('<Relationship[^>]*Id="' + rid + '"[^>]*Target="([^"]+)"').exec(relsXml) || [])[1];
+    if (t) sheetPath = 'xl/' + t.replace(/^\//, '').replace(/^xl\//, '');
+  } catch (e) {}
+  const ssBytes = await zip.get('xl/sharedStrings.xml');
+  const shared = [];
+  if (ssBytes) for (const m of td.decode(ssBytes).matchAll(/<si>([\s\S]*?)<\/si>/g)) shared.push(unesc(getT(m[1])));
+  const sheetBytes = await zip.get(sheetPath);
+  if (!sheetBytes) throw new Error('시트를 찾지 못했습니다');
+  const rows = [];
+  for (const rm of td.decode(sheetBytes).matchAll(/<row[^>]*>([\s\S]*?)<\/row>/g)) {
+    const cells = [];
+    for (const cm of rm[1].matchAll(/<c\s([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
+      const attrs = cm[1], inner = cm[2] || '';
+      const rAttr = /r="([A-Z]+)\d+"/.exec(attrs);
+      const col = rAttr ? colIndex(rAttr[1]) : cells.length;
+      const t = (/t="([^"]*)"/.exec(attrs) || [])[1];
+      let v = null;
+      if (t === 'inlineStr') v = unesc(getT(inner));
+      else {
+        const vm = /<v[^>]*>([\s\S]*?)<\/v>/.exec(inner);
+        if (vm) {
+          if (t === 's') v = shared[parseInt(vm[1])];
+          else if (t === 'str' || t === 'e') v = unesc(vm[1]);
+          else if (t === 'b') v = vm[1] === '1';
+          else { const n = Number(vm[1]); v = isFinite(n) ? n : unesc(vm[1]); }
+        }
+      }
+      cells[col] = v;
+    }
+    rows.push(cells);
+  }
+  return rows;
+}
+
+// ===== 데이터 추출 · 매칭 로직 =====
 const STOPWORDS = new Set(['선택','교차가능','온라인','온라인행사','행사1+1','전컬러','낱개']);
 let dataA = null, dataB = null, result = null;
 
-function setupDrop(dropId, inputId, fileLabelId, setter) {
-  const drop = document.getElementById(dropId);
-  const input = document.getElementById(inputId);
-  const label = document.getElementById(fileLabelId);
-  drop.addEventListener('click', () => input.click());
-  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
-  drop.addEventListener('dragleave', () => drop.classList.remove('over'));
-  drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over'); if (e.dataTransfer.files[0]) handle(e.dataTransfer.files[0]); });
-  input.addEventListener('change', () => { if (input.files[0]) handle(input.files[0]); });
-  function handle(file) {
-    const reader = new FileReader();
-    reader.onload = e => {
-      try {
-        const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
-        const parsed = extractRows(rows);
-        if (parsed.length === 0) throw new Error('상품 데이터를 찾지 못했습니다. 관리번호·바코드·품명 열이 있는지 확인하세요.');
-        setter(parsed);
-        drop.classList.add('ok');
-        label.textContent = file.name + ' (' + parsed.length + '개 상품)';
-        checkReady();
-      } catch (err) { showErr(file.name + ' 읽기 실패: ' + err.message); }
-    };
-    reader.readAsArrayBuffer(file);
-  }
-}
-
-// 헤더 행(관리번호 포함)을 찾아 열 위치 자동 감지, 없으면 A/B/C열 사용
 function extractRows(rows) {
   let ci = { code: 0, barcode: 1, name: 2 }, start = 0;
   for (let i = 0; i < Math.min(rows.length, 10); i++) {
@@ -130,20 +190,17 @@ function extractRows(rows) {
       ci.code = idx;
       const bi = r.findIndex(c => typeof c === 'string' && c.includes('바코드'));
       const ni = r.findIndex(c => typeof c === 'string' && (c.includes('품명') || c.includes('상품명')));
-      if (bi >= 0) ci.barcode = bi;
-      if (ni >= 0) ci.name = ni;
-      start = i + 1;
-      break;
+      if (bi >= 0) ci.barcode = bi; if (ni >= 0) ci.name = ni;
+      start = i + 1; break;
     }
   }
   const out = [];
   for (let i = start; i < rows.length; i++) {
     const r = rows[i] || [];
-    const code = r[ci.code], name = r[ci.name];
-    if (code == null || name == null) continue;
-    const codeNum = Number(String(code).trim());
-    if (!isFinite(codeNum) || String(code).trim() === '') continue;
-    out.push({ code: codeNum, barcode: r[ci.barcode] != null ? String(r[ci.barcode]) : '', name: String(name) });
+    if (r[ci.code] == null || r[ci.name] == null) continue;
+    const codeNum = Number(String(r[ci.code]).trim());
+    if (!isFinite(codeNum)) continue;
+    out.push({ code: codeNum, barcode: r[ci.barcode] != null ? String(r[ci.barcode]) : '', name: String(r[ci.name]) });
   }
   return out;
 }
@@ -163,11 +220,7 @@ function parseOption(name) {
   }
   return { no, kw };
 }
-
-function parseRanges(name) {
-  return [...name.matchAll(/NO\s*(\d+)\s*~\s*(?:NO\s*)?(\d+)/gi)].map(m => [parseInt(m[1]), parseInt(m[2])]);
-}
-
+const parseRanges = name => [...name.matchAll(/NO\s*(\d+)\s*~\s*(?:NO\s*)?(\d+)/gi)].map(m => [parseInt(m[1]), parseInt(m[2])]);
 const norm = s => s.replace(/[\s)()]+/g, '');
 
 function runMatch() {
@@ -180,9 +233,8 @@ function runMatch() {
       if (p.deleted) continue;
       let score = 0; const reasons = [];
       if (no !== null) {
-        for (const [a, b] of p.ranges) {
+        for (const [a, b] of p.ranges)
           if (a <= no && no <= b) { score += 2; reasons.push('NO' + no + ' ∈ NO' + a + '~' + b); break; }
-        }
       }
       if (kw && norm(p.name).includes(kw)) { score += 1; reasons.push("시리즈 '" + kw + "'"); }
       if (score > bestScore) { bestScore = score; best = p; bestReason = reasons.join(' + '); }
@@ -197,8 +249,29 @@ function runMatch() {
   render();
 }
 
+// ===== UI =====
+function setupDrop(dropId, inputId, fileLabelId, setter) {
+  const drop = document.getElementById(dropId);
+  const input = document.getElementById(inputId);
+  const label = document.getElementById(fileLabelId);
+  drop.addEventListener('click', () => input.click());
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+  drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over'); if (e.dataTransfer.files[0]) handle(e.dataTransfer.files[0]); });
+  input.addEventListener('change', () => { if (input.files[0]) handle(input.files[0]); });
+  async function handle(file) {
+    try {
+      const rows = await readXlsxRows(await file.arrayBuffer());
+      const parsed = extractRows(rows);
+      if (parsed.length === 0) throw new Error('상품 데이터를 찾지 못했습니다. 관리번호·바코드·품명 열이 있는지 확인하세요.');
+      setter(parsed);
+      drop.classList.add('ok');
+      label.textContent = file.name + ' (' + parsed.length + '개 상품)';
+      checkReady();
+    } catch (err) { showErr(file.name + ' 읽기 실패: ' + err.message); }
+  }
+}
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
-
 function render() {
   const { detail, parents } = result;
   const miss = detail.filter(d => !d.parent);
@@ -218,23 +291,30 @@ function render() {
   document.getElementById('tbDetail').innerHTML = detail.filter(d => d.parent).map(d =>
     '<tr><td>' + d.opt.code + '</td><td>' + esc(d.opt.name) + '</td><td>' + d.parent.code + '</td><td>' + esc(d.parent.name) + '</td><td>' + esc(d.reason) + '</td></tr>').join('');
   document.getElementById('secDetail').style.display = 'block';
-  document.getElementById('dlBtn').style.display = 'inline-block';
+  for (const id of ['dl1', 'dl2', 'dl3', 'copyBtn']) document.getElementById(id).style.display = 'inline-block';
 }
-
-function download() {
-  const { detail, parents } = result;
-  const wb = XLSX.utils.book_new();
-  const s1 = [['관리번호', '바코드', '상품명', '매칭 단품수'],
-    ...parents.map(r => [r.p.code, r.p.barcode, r.p.name, r.n])];
-  const s2 = [['단품 관리번호', '단품 바코드', '단품명', '어미 관리번호', '어미 바코드', '어미 상품명', '매칭 근거'],
-    ...detail.filter(d => d.parent).map(d => [d.opt.code, d.opt.barcode, d.opt.name, d.parent.code, d.parent.barcode, d.parent.name, d.reason])];
-  const s3 = [['관리번호', '바코드', '단품명', '추출된 시리즈', '단종'],
-    ...detail.filter(d => !d.parent).map(d => [d.opt.code, d.opt.barcode, d.opt.name, d.kw || '', d.danjong ? '단종' : ''])];
-  const w1 = XLSX.utils.aoa_to_sheet(s1); w1['!cols'] = [{wch:10},{wch:12},{wch:60},{wch:11}];
-  const w2 = XLSX.utils.aoa_to_sheet(s2); w2['!cols'] = [{wch:12},{wch:12},{wch:50},{wch:12},{wch:12},{wch:50},{wch:28}];
-  const w3 = XLSX.utils.aoa_to_sheet(s3); w3['!cols'] = [{wch:12},{wch:12},{wch:55},{wch:16},{wch:8}];
-  XLSX.utils.book_append_sheet(wb, w1, '어미상품 리스트');
-  XLSX.utils.book_append_sheet(wb, w2, '매칭 상세');
-  XLSX.utils.book_append_sheet(wb, w3, '미매칭 단품');
+function csvCell(v) { const s = String(v == null ? '' : v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
+function downloadCsv(rows, name) {
+  const csv = '﻿' + rows.map(r => r.map(csvCell).join(',')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
   const d = new Date(), ym = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-  XLSX.writeFile(w
+  a.download = name + '_' + ym + '.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+function showErr(msg) { const e = document.getElementById('err'); e.textContent = msg; e.style.display = 'block'; }
+function checkReady() {
+  document.getElementById('err').style.display = 'none';
+  document.getElementById('runBtn').disabled = !(dataA && dataB);
+}
+setupDrop('dropA', 'inputA', 'fileA', v => dataA = v);
+setupDrop('dropB', 'inputB', 'fileB', v => dataB = v);
+document.getElementById('runBtn').addEventListener('click', runMatch);
+document.getElementById('dl1').addEventListener('click', () => downloadCsv(
+  [['관리번호','바코드','상품명','매칭 단품수'], ...result.parents.map(r => [r.p.code, r.p.barcode, r.p.name, r.n])], '어미상품_코드리스트'));
+document.getElementById('dl2').addEventListener('click', () => downloadCsv(
+  [['단품 관리번호','단품 바코드','단품명','어미 관리번호','어미 바코드','어미 상품명','매칭 근거'],
+   ...result.detail.filter(d => d.parent).map(d => [d.opt.code, d.opt.barcode, d.opt.name, d.parent.code, d.parent.barcode, d.parent.name, d.reason])], '매칭상세'));
+document.getElementById('dl3').addEventListener('click', () => downloadCsv(
+  [['관리번호','바코드','단품명','추출된 시리즈','단종'], ...result.detail.filter(d => !d.parent).map(d => [d.opt.code, d.opt.barcode, d.opt.name, d.kw || '', d.danjong ? '단종' : ''])], '미�
