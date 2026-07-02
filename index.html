@@ -78,8 +78,8 @@
 
   <section id="secMiss">
     <h2>⚠️ 미매칭 단품 (어미상품을 못 찾은 항목)</h2>
-    <table class="warn"><thead><tr><th>관리번호</th><th>바코드</th><th>단품명</th><th>추출된 시리즈</th></tr></thead><tbody id="tbMiss"></tbody></table>
-    <p class="hint">상품관리 파일에 해당 시리즈의 어미상품이 없는 경우입니다. 직접 확인해 주세요.</p>
+    <table class="warn"><thead><tr><th>관리번호</th><th>바코드</th><th>단품명</th><th>추출된 시리즈</th><th>단종</th></tr></thead><tbody id="tbMiss"></tbody></table>
+    <p class="hint">상품관리 파일에 해당 시리즈의 어미상품이 없는 경우입니다. 단종 칸은 상품명에 '단종'·'삭제' 문구가 있으면 자동 체크되며, 클릭해서 직접 표시할 수도 있습니다. 엑셀 다운로드에 포함됩니다.</p>
   </section>
 
   <section id="secDetail">
@@ -187,7 +187,7 @@ function runMatch() {
       if (kw && norm(p.name).includes(kw)) { score += 1; reasons.push("시리즈 '" + kw + "'"); }
       if (score > bestScore) { bestScore = score; best = p; bestReason = reasons.join(' + '); }
     }
-    detail.push({ opt, parent: best, reason: bestReason, kw });
+    detail.push({ opt, parent: best, reason: bestReason, kw, danjong: /단종|삭제/.test(opt.name) });
     if (best) {
       if (!parentMap.has(best.code)) parentMap.set(best.code, { p: best, n: 0 });
       parentMap.get(best.code).n++;
@@ -210,7 +210,10 @@ function render() {
     '<tr><td>' + r.p.code + '</td><td>' + esc(r.p.barcode) + '</td><td>' + esc(r.p.name) + '</td><td>' + r.n + '</td></tr>').join('');
   document.getElementById('secParent').style.display = 'block';
   document.getElementById('tbMiss').innerHTML = miss.map(d =>
-    '<tr><td>' + d.opt.code + '</td><td>' + esc(d.opt.barcode) + '</td><td>' + esc(d.opt.name) + '</td><td>' + esc(d.kw || '') + '</td></tr>').join('');
+    '<tr><td>' + d.opt.code + '</td><td>' + esc(d.opt.barcode) + '</td><td>' + esc(d.opt.name) + '</td><td>' + esc(d.kw || '') + '</td>' +
+    '<td style="text-align:center"><input type="checkbox" data-di="' + detail.indexOf(d) + '"' + (d.danjong ? ' checked' : '') + ' title="단종 표시"></td></tr>').join('');
+  document.getElementById('tbMiss').querySelectorAll('input[type=checkbox]').forEach(cb =>
+    cb.addEventListener('change', () => { detail[parseInt(cb.dataset.di)].danjong = cb.checked; }));
   document.getElementById('secMiss').style.display = miss.length ? 'block' : 'none';
   document.getElementById('tbDetail').innerHTML = detail.filter(d => d.parent).map(d =>
     '<tr><td>' + d.opt.code + '</td><td>' + esc(d.opt.name) + '</td><td>' + d.parent.code + '</td><td>' + esc(d.parent.name) + '</td><td>' + esc(d.reason) + '</td></tr>').join('');
@@ -225,28 +228,13 @@ function download() {
     ...parents.map(r => [r.p.code, r.p.barcode, r.p.name, r.n])];
   const s2 = [['단품 관리번호', '단품 바코드', '단품명', '어미 관리번호', '어미 바코드', '어미 상품명', '매칭 근거'],
     ...detail.filter(d => d.parent).map(d => [d.opt.code, d.opt.barcode, d.opt.name, d.parent.code, d.parent.barcode, d.parent.name, d.reason])];
-  const s3 = [['관리번호', '바코드', '단품명', '추출된 시리즈'],
-    ...detail.filter(d => !d.parent).map(d => [d.opt.code, d.opt.barcode, d.opt.name, d.kw || ''])];
+  const s3 = [['관리번호', '바코드', '단품명', '추출된 시리즈', '단종'],
+    ...detail.filter(d => !d.parent).map(d => [d.opt.code, d.opt.barcode, d.opt.name, d.kw || '', d.danjong ? '단종' : ''])];
   const w1 = XLSX.utils.aoa_to_sheet(s1); w1['!cols'] = [{wch:10},{wch:12},{wch:60},{wch:11}];
   const w2 = XLSX.utils.aoa_to_sheet(s2); w2['!cols'] = [{wch:12},{wch:12},{wch:50},{wch:12},{wch:12},{wch:50},{wch:28}];
-  const w3 = XLSX.utils.aoa_to_sheet(s3); w3['!cols'] = [{wch:12},{wch:12},{wch:55},{wch:16}];
+  const w3 = XLSX.utils.aoa_to_sheet(s3); w3['!cols'] = [{wch:12},{wch:12},{wch:55},{wch:16},{wch:8}];
   XLSX.utils.book_append_sheet(wb, w1, '어미상품 리스트');
   XLSX.utils.book_append_sheet(wb, w2, '매칭 상세');
   XLSX.utils.book_append_sheet(wb, w3, '미매칭 단품');
   const d = new Date(), ym = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-  XLSX.writeFile(wb, '행사_어미상품_코드리스트_' + ym + '.xlsx');
-}
-
-function showErr(msg) { const e = document.getElementById('err'); e.textContent = msg; e.style.display = 'block'; }
-function checkReady() {
-  document.getElementById('err').style.display = 'none';
-  document.getElementById('runBtn').disabled = !(dataA && dataB);
-}
-
-setupDrop('dropA', 'inputA', 'fileA', v => dataA = v);
-setupDrop('dropB', 'inputB', 'fileB', v => dataB = v);
-document.getElementById('runBtn').addEventListener('click', runMatch);
-document.getElementById('dlBtn').addEventListener('click', download);
-</script>
-</body>
-</html>
+  XLSX.writeFile(w
