@@ -42,7 +42,7 @@
 </head>
 <body>
   <h1>📋 행사 어미상품 코드 찾기</h1>
-  <p class="sub">① 행사 단품 엑셀 + ② 상품관리(어미상품) 엑셀 → 상품명의 NO번호 범위와 시리즈명(워터밤, 아로마 등)으로 자동 매칭. 상품명에 '삭제'가 포함되거나 단종(Y)인 어미상품은 제외됩니다.</p>
+  <p class="sub">① 행사 단품 엑셀 + ② 상품관리(어미상품) 엑셀 → 상품명의 NO번호 범위와 시리즈명(워터밤, 아로마 등)으로 자동 매칭. ②번 파일에서는 묶음형 상품명(코드 범위·N종·선택·모음·전컬러 등)만 어미 후보로 사용하며, 세트상품('세트'·'주문출고'·● 포함)과 '삭제'·단종(Y) 상품은 제외됩니다.</p>
 
   <div class="drops">
     <div class="drop" id="dropA">
@@ -75,18 +75,18 @@
   </div>
 
   <section id="secParent">
-    <h2>✅ 어미상품 코드리스트</h2>
+    <h2>✅ 어미상품 코드리스트 <span id="cntParent" style="font-weight:normal;font-size:12px;color:#666"></span></h2>
     <table><thead><tr><th>관리번호</th><th>바코드</th><th>상품명</th><th id="thPrice" style="cursor:pointer;user-select:none" title="클릭하면 내림차순/오름차순 전환">행사가 ▼</th><th>매칭 단품수</th></tr></thead><tbody id="tbParent"></tbody></table>
   </section>
 
   <section id="secMiss">
-    <h2>⚠️ 미매칭 단품</h2>
+    <h2>⚠️ 미매칭 단품 <span id="cntMiss" style="font-weight:normal;font-size:12px;color:#666"></span></h2>
     <table class="warn"><thead><tr><th>관리번호</th><th>바코드</th><th>단품명</th><th>추출된 시리즈</th><th>단종</th></tr></thead><tbody id="tbMiss"></tbody></table>
-    <p class="hint">단종 칸은 파일의 '단종' 컬럼 값이 Y인 경우에만 자동 체크되며, 클릭해서 직접 표시할 수도 있습니다. CSV에 포함됩니다.</p>
+    <p class="hint">단종 칸은 단품 파일의 '단종' 컬럼 값이 Y일 때 자동 체크되며, 단품 파일에 해당 컬럼이 없으면 ②번 파일에서 관리번호·바코드로 대조한 단종 값을 사용합니다. 클릭해서 직접 표시할 수도 있습니다. CSV에 포함됩니다.</p>
   </section>
 
   <section id="secDetail">
-    <h2>🔍 매칭 상세 (근거)</h2>
+    <h2>🔍 매칭 상세 (근거) <span id="cntDetail" style="font-weight:normal;font-size:12px"></span></h2>
     <table><thead><tr><th>단품 관리번호</th><th>단품명</th><th>어미 관리번호</th><th>어미 상품명</th><th>매칭 근거</th></tr></thead><tbody id="tbDetail"></tbody></table>
   </section>
 
@@ -235,24 +235,33 @@ const parseRanges = name => {
 };
 const norm = s => s.replace(/[\s)()]+/g, '');
 
+const isBundleName = n => /[A-Za-z]{1,4}\s*\d+\s*~/.test(n) || /\d+\s*~\s*\d+(?!\s*(mm|cm|ml|g|호|인치|oz))/i.test(n) && !/\d+(\.\d+)?\s*~\s*\d+(\.\d+)?\s*(mm|cm|ml|g|호|인치|oz)/i.test(n) || /\d+\s*종/.test(n) || n.includes('선택') || n.includes('모음') || n.includes('전컬러') || n.includes('전라인');
+const isSetName = n => n.includes('세트') || n.includes('주문출고') || n.trim().startsWith('●');
 function runMatch() {
-  const parents = dataB.map(p => ({ ...p, ranges: parseRanges(p.name), deleted: p.name.includes('삭제') || p.dj === true }));
+  const bDj = new Map();
+  for (const p of dataB) if (p.dj !== undefined) { bDj.set(p.code, p.dj); if (p.barcode) bDj.set('b' + p.barcode, p.dj); }
+  const lookupDj = o => o.dj !== undefined ? o.dj : (bDj.has(o.code) ? bDj.get(o.code) : (bDj.has('b' + o.barcode) ? bDj.get('b' + o.barcode) : false));
+  const parents = dataB.map(p => ({ ...p, ranges: parseRanges(p.name), deleted: p.name.includes('삭제') || p.dj === true || !isBundleName(p.name) || isSetName(p.name) }));
   const detail = [], parentMap = new Map();
   for (const opt of dataA) {
     const { codes, kws } = parseOption(opt.name);
+    const brandKey = norm(opt.name).replace(/^●/, '').slice(0, 4);
     let best = null, bestScore = 0, bestReason = '';
     for (const p of parents) {
       if (p.deleted) continue;
+      const normP = norm(p.name);
       let score = 0; const reasons = [];
       outer: for (const [pre, n] of codes) {
         for (const [rp, a, b] of p.ranges)
           if (pre === rp && a <= n && n <= b) { score += 2; reasons.push(pre + n + ' ∈ ' + rp + a + '~' + b); break outer; }
       }
-      for (const k of kws)
-        if (norm(p.name).includes(k)) { score += 1; reasons.push("시리즈 '" + k + "'"); break; }
+      if (score > 0 || brandKey.length < 4 || normP.includes(brandKey)) {
+        for (const k of kws)
+          if (normP.includes(k)) { score += 1; reasons.push("시리즈 '" + k + "'"); break; }
+      }
       if (score > bestScore) { bestScore = score; best = p; bestReason = reasons.join(' + '); }
     }
-    detail.push({ opt, parent: best, reason: bestReason, kw: kws.join(', '), danjong: opt.dj === true });
+    detail.push({ opt, parent: best, reason: bestReason, kw: kws.join(', '), danjong: lookupDj(opt) === true });
     if (best) {
       if (!parentMap.has(best.code)) parentMap.set(best.code, { p: best, n: 0, prices: new Set() });
       parentMap.get(best.code).n++;
@@ -289,9 +298,15 @@ function esc(s) { const d = document.createElement('div'); d.textContent = s; re
 function render() {
   const { detail, parents } = result;
   const miss = detail.filter(d => !d.parent);
+  const matched = detail.length - miss.length;
+  const inputN = dataA ? dataA.length : detail.length;
+  const balanced = inputN === matched + miss.length;
   document.getElementById('nParent').textContent = parents.length;
-  document.getElementById('nMatch').textContent = detail.length - miss.length;
+  document.getElementById('nMatch').textContent = matched;
   document.getElementById('nMiss').textContent = miss.length;
+  document.getElementById('cntParent').textContent = '— ' + parents.length + '개';
+  document.getElementById('cntMiss').textContent = '— ' + miss.length + '건';
+  document.getElementById('cntDetail').innerHTML = '— 매칭 ' + matched + '건 · <b style="color:' + (balanced ? '#2e9e5b' : '#c0392b') + '">검수: 입력 단품 ' + inputN + '건 = 매칭 ' + matched + ' + 미매칭 ' + miss.length + (balanced ? ' ✔ 일치' : ' ✖ 불일치') + '</b>';
   document.getElementById('summary').style.display = 'flex';
   const fmtP = r => sortPrices(r).map(x => x.toLocaleString()).join(' / ');
   document.getElementById('tbParent').innerHTML = sortedParents().map(r =>
@@ -342,9 +357,24 @@ document.getElementById('dl3').addEventListener('click', () => downloadCsv(
 document.getElementById('copyBtn').addEventListener('click', async () => {
   const tsv = [['관리번호','바코드','상품명','행사가','매칭 단품수'], ...sortedParents().map(r => [r.p.code, r.p.barcode, r.p.name, sortPrices(r).join(' / '), r.n])]
     .map(r => r.join('\t')).join('\n');
-  await navigator.clipboard.writeText(tsv);
-  const b = document.getElementById('copyBtn'); const t = b.textContent;
-  b.textContent = '✅ 복사됨!'; setTimeout(() => b.textContent = t, 1500);
+  let ok = false;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    try { await navigator.clipboard.writeText(tsv); ok = true; } catch (e) {}
+  }
+  if (!ok) {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = tsv;
+      ta.style.position = 'fixed'; ta.style.top = '0'; ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus(); ta.select(); ta.setSelectionRange(0, tsv.length);
+      ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+    } catch (e) {}
+  }
+  const b = document.getElementById('copyBtn');
+  b.textContent = ok ? '✅ 복사됨!' : '❌ 복사 차단됨 — CSV 버튼을 이용하세요';
+  setTimeout(() => { b.textContent = '📄 표 복사(엑셀 붙여넣기용)'; }, 2500);
 });
 </script>
 </body>
