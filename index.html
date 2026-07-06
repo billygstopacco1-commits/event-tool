@@ -246,16 +246,19 @@ function runMatch() {
   for (const opt of dataA) {
     const { codes, kws } = parseOption(opt.name);
     const brandKey = norm(opt.name).replace(/^●/, '').slice(0, 4);
+    // 브랜드 가드: 어미 후보 중 이 브랜드를 포함한 상품이 하나라도 있으면, 같은 브랜드끼리만 매칭
+    const brandGuard = brandKey.length >= 4 && parents.some(p => !p.deleted && norm(p.name).includes(brandKey));
     let best = null, bestScore = 0, bestReason = '';
     for (const p of parents) {
       if (p.deleted) continue;
       const normP = norm(p.name);
+      if (brandGuard && !normP.includes(brandKey)) continue;
       let score = 0; const reasons = [];
       outer: for (const [pre, n] of codes) {
         for (const [rp, a, b] of p.ranges)
           if (pre === rp && a <= n && n <= b) { score += 2; reasons.push(pre + n + ' ∈ ' + rp + a + '~' + b); break outer; }
       }
-      if (score > 0 || brandKey.length < 4 || normP.includes(brandKey)) {
+      {
         for (const k of kws)
           if (normP.includes(k)) { score += 1; reasons.push("시리즈 '" + k + "'"); break; }
       }
